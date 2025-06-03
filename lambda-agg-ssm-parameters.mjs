@@ -12,7 +12,10 @@ export const handler = async (event) => {
 
     try {
         const parameters = await getAllParameters(ssmClient, basePath);
-        const result = transformParameters(parameters, basePath);
+        let result = transformParameters(parameters, basePath);
+        result = mergeWithDefault(result);
+        result = removeAliasLatest(result);
+        result = removeDefault(result);
 
         const response = {
             status: '200',
@@ -98,4 +101,47 @@ function transformParameters(parameters, basePath) {
     });
 
     return result;
+}
+
+function mergeWithDefault(config) {
+    const defaultKey = "default"
+    const defaultConfig = config.hasOwnProperty(defaultKey) ? config.default : null;
+    if (!defaultConfig) {
+        return config;
+    }
+
+    for (const widget in config) {
+        if (widget !== defaultKey) {
+            for (const key in defaultConfig) {
+                // Clone the default config into the widget config
+                if (!config[widget].hasOwnProperty(key)) {
+                    config[widget][key] = JSON.parse(JSON.stringify(defaultConfig[key]));
+                }
+            }
+        }
+    }
+
+    return config;
+}
+
+function removeAliasLatest(config) {
+    // remove latest because it's for test only
+    const aliasKey = 'alias';
+
+    for (const widget in config) {
+        if (widget !== 'default' && config[widget].hasOwnProperty(aliasKey)) {
+            // Filter out the 'latest' from the alias array if it exists
+            config[widget][aliasKey] = config[widget][aliasKey].filter(alias => alias.toLowerCase() !== 'latest');
+        }
+    }
+    
+    return config;
+}
+
+function removeDefault(config) {
+    if (config.hasOwnProperty('default')) {
+        delete config['default'];
+    }
+    
+    return config;
 }
